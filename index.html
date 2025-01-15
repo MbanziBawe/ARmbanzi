@@ -39,8 +39,6 @@
       renderer.autoClear = false;
 
       // The API directly updates the camera matrices.
-      // Disable matrix auto updates so three.js doesn't attempt
-      // to handle the matrices independently.
       const camera = new THREE.PerspectiveCamera();
       camera.matrixAutoUpdate = false;
 
@@ -59,6 +57,13 @@
       loader.load("https://vazxmixjsiawhamofees.supabase.co/storage/v1/object/public/models/lamp-post/model.gltf", function (gltf) {
         lamp = gltf.scene;
       });
+
+      // Create the reticle (indicator) for where to place the object
+      const reticleGeometry = new THREE.CircleGeometry(0.1, 32);
+      const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, opacity: 0.5, transparent: true });
+      const reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
+      reticle.visible = false; // Hide reticle until a surface is detected
+      scene.add(reticle);
 
       session.addEventListener("select", (event) => {
         const hitTestResults = event.frame.getHitTestResults(hitTestSource);
@@ -81,7 +86,6 @@
         // Retrieve the pose of the device.
         const pose = frame.getViewerPose(referenceSpace);
         if (pose) {
-          // In mobile AR, we only have one view.
           const view = pose.views[0];
 
           const viewport = session.renderState.baseLayer.getViewport(view);
@@ -92,8 +96,21 @@
           camera.projectionMatrix.fromArray(view.projectionMatrix);
           camera.updateMatrixWorld(true);
 
+          const hitTestResults = frame.getHitTestResults(hitTestSource);
+          if (hitTestResults.length > 0) {
+            const hitPose = hitTestResults[0].getPose(referenceSpace);
+
+            // Update reticle position to match the hit position
+            reticle.visible = true;
+            reticle.position.set(hitPose.transform.position.x, hitPose.transform.position.y, hitPose.transform.position.z);
+            reticle.updateMatrixWorld(true);
+          } else {
+            // If no surface detected, hide the reticle
+            reticle.visible = false;
+          }
+
           // Render the scene with THREE.WebGLRenderer.
-          renderer.render(scene, camera)
+          renderer.render(scene, camera);
         }
       }
       session.requestAnimationFrame(onXRFrame);
